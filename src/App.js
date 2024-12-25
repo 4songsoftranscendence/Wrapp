@@ -97,6 +97,17 @@ const GiftWrapper = () => {
           </div>
           <p className="text-xs md:text-sm text-gray-600 mt-1 md:mt-2 font-normal">The app that helps you wrap!</p>
         </CardTitle>
+        <div className="mt-4 text-center space-y-3">
+          <p className="text-base md:text-lg font-semibold text-emerald-600">✨ No More Gift-Wrapping Guesswork! ✨</p>
+          <p className="text-sm md:text-base text-purple-600 font-medium">Tired of wonky wrapping jobs? Done with wasting paper on failed attempts?</p>
+          <p className="text-sm md:text-base text-purple-600 font-medium">Wrapp is here to make wrapping fun!</p>
+          <div className="text-xs md:text-sm text-gray-600 space-y-2 bg-purple-50 p-3 rounded-lg">
+            <p className="font-medium">Get the perfect wrap in three easy steps:</p>
+            <p>✨ Upload a photo of your gift or enter its dimensions</p>
+            <p>📏 Get the exact amount of wrapping paper you need</p>
+            <p>🎁 Follow our simple folding instructions</p>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="p-4 md:p-6">
         <div className="mb-4 md:mb-6">
