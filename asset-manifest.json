@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/Wrapp/static/css/main.382ff7fd.css",
+    "main.js": "/Wrapp/static/js/main.b9838d08.js",
+    "static/js/488.35ed5b46.chunk.js": "/Wrapp/static/js/488.35ed5b46.chunk.js",
+    "index.html": "/Wrapp/index.html",
+    "main.382ff7fd.css.map": "/Wrapp/static/css/main.382ff7fd.css.map",
+    "main.b9838d08.js.map": "/Wrapp/static/js/main.b9838d08.js.map",
+    "488.35ed5b46.chunk.js.map": "/Wrapp/static/js/488.35ed5b46.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.382ff7fd.css",
+    "static/js/main.b9838d08.js"
+  ]
+}
