@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/Wrapp/static/css/main.a3dc8b30.css",
-    "main.js": "/Wrapp/static/js/main.a2dd4dc3.js",
+    "main.css": "/Wrapp/static/css/main.9f90112a.css",
+    "main.js": "/Wrapp/static/js/main.caf9191c.js",
     "static/js/488.35ed5b46.chunk.js": "/Wrapp/static/js/488.35ed5b46.chunk.js",
     "index.html": "/Wrapp/index.html",
-    "main.a3dc8b30.css.map": "/Wrapp/static/css/main.a3dc8b30.css.map",
-    "main.a2dd4dc3.js.map": "/Wrapp/static/js/main.a2dd4dc3.js.map",
+    "main.9f90112a.css.map": "/Wrapp/static/css/main.9f90112a.css.map",
+    "main.caf9191c.js.map": "/Wrapp/static/js/main.caf9191c.js.map",
     "488.35ed5b46.chunk.js.map": "/Wrapp/static/js/488.35ed5b46.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.a3dc8b30.css",
-    "static/js/main.a2dd4dc3.js"
+    "static/css/main.9f90112a.css",
+    "static/js/main.caf9191c.js"
   ]
 }
