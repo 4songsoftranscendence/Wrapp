@@ -1,5 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Package, Upload } from 'lucide-react';
+
+const REFERENCE_SIZES = {
+  creditCard: {
+    width: 3.375, // inches
+    height: 2.125  // inches
+  },
+  quarter: {
+    diameter: 0.955 // inches
+  }
+};
 
 // Define Card components inline since we can't use the external library
 const Card = ({ className, children }) => (
@@ -27,75 +37,32 @@ const GiftWrapper = () => {
   const [result, setResult] = useState(null);
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [model, setModel] = useState(null);
   const imageRef = useRef(null);
 
-  useEffect(() => {
-    loadModel();
-  }, []);
-
-  const loadModel = async () => {
-    try {
-      const loadedModel = await cocoSsd.load();
-      setModel(loadedModel);
-    } catch (error) {
-      console.error('Error loading model:', error);
-    }
+  const measureWithReference = (imgElement) => {
+    // This is a simplified measurement - we'll enhance it later
+    const estimatedWidthInches = imgElement.width / 100; // Simple ratio for now
+    return {
+      length: Math.round(estimatedWidthInches * 10) / 10,
+      width: Math.round((estimatedWidthInches * 0.8) * 10) / 10,
+      height: Math.round((estimatedWidthInches * 0.3) * 10) / 10
+    };
   };
 
-  const detectDimensions = async (imageElement) => {
-    if (!model) return null;
-
-    try {
-      const predictions = await model.detect(imageElement);
-      
-      // Find the box prediction with highest confidence
-      const box = predictions[0]?.bbox;
-      if (box) {
-        const [x, y, width, height] = box;
-        
-        // Convert pixel measurements to approximate inches
-        // This is a simplified conversion - would need calibration
-        const PIXELS_PER_INCH = 96; // This is an approximation
-        
-        return {
-          length: Math.round(width / PIXELS_PER_INCH * 10) / 10,
-          width: Math.round(height / PIXELS_PER_INCH * 10) / 10,
-          // Estimate depth based on width/height ratio
-          height: Math.round((width * 0.3) / PIXELS_PER_INCH * 10) / 10
-        };
-      }
-      return null;
-    } catch (error) {
-      console.error('Error detecting dimensions:', error);
-      return null;
-    }
-  };
-
-  const handleImageUpload = async (event) => {
+  const handleImageUpload = (event) => {
     const file = event.target.files[0];
     if (file && file.type.startsWith('image/')) {
       setLoading(true);
-      
       const reader = new FileReader();
-      reader.onload = async () => {
+      reader.onload = () => {
         setImage(reader.result);
         
-        // Create an image element for detection
+        // Create an image element to measure
         const img = new Image();
         img.src = reader.result;
-        img.onload = async () => {
-          const detectedDimensions = await detectDimensions(img);
-          if (detectedDimensions) {
-            setDimensions(detectedDimensions);
-          } else {
-            // Fallback to default dimensions if detection fails
-            setDimensions({
-              length: '10',
-              width: '8',
-              height: '4'
-            });
-          }
+        img.onload = () => {
+          const measuredDimensions = measureWithReference(img);
+          setDimensions(measuredDimensions);
           setLoading(false);
         };
       };
@@ -180,6 +147,7 @@ const GiftWrapper = () => {
                 ) : image ? (
                   <div className="relative w-full h-full">
                     <img
+                      ref={imageRef}
                       src={image}
                       alt="Uploaded gift"
                       className="max-h-28 md:max-h-40 w-auto mx-auto object-contain"
@@ -222,7 +190,7 @@ const GiftWrapper = () => {
             <input
               type="number"
               min="0"
-              className="w-full p-2 border rounded"
+              className="w-full p-1 md:p-2 border rounded text-sm md:text-base"
               value={dimensions.width}
               onChange={(e) => setDimensions({ ...dimensions, width: e.target.value })}
             />
@@ -232,7 +200,7 @@ const GiftWrapper = () => {
             <input
               type="number"
               min="0"
-              className="w-full p-2 border rounded"
+              className="w-full p-1 md:p-2 border rounded text-sm md:text-base"
               value={dimensions.height}
               onChange={(e) => setDimensions({ ...dimensions, height: e.target.value })}
             />
