@@ -27,23 +27,77 @@ const GiftWrapper = () => {
   const [result, setResult] = useState(null);
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [model, setModel] = useState(null);
+  const imageRef = useRef(null);
 
-  const handleImageUpload = (event) => {
+  useEffect(() => {
+    loadModel();
+  }, []);
+
+  const loadModel = async () => {
+    try {
+      const loadedModel = await cocoSsd.load();
+      setModel(loadedModel);
+    } catch (error) {
+      console.error('Error loading model:', error);
+    }
+  };
+
+  const detectDimensions = async (imageElement) => {
+    if (!model) return null;
+
+    try {
+      const predictions = await model.detect(imageElement);
+      
+      // Find the box prediction with highest confidence
+      const box = predictions[0]?.bbox;
+      if (box) {
+        const [x, y, width, height] = box;
+        
+        // Convert pixel measurements to approximate inches
+        // This is a simplified conversion - would need calibration
+        const PIXELS_PER_INCH = 96; // This is an approximation
+        
+        return {
+          length: Math.round(width / PIXELS_PER_INCH * 10) / 10,
+          width: Math.round(height / PIXELS_PER_INCH * 10) / 10,
+          // Estimate depth based on width/height ratio
+          height: Math.round((width * 0.3) / PIXELS_PER_INCH * 10) / 10
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error detecting dimensions:', error);
+      return null;
+    }
+  };
+
+  const handleImageUpload = async (event) => {
     const file = event.target.files[0];
     if (file && file.type.startsWith('image/')) {
       setLoading(true);
+      
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         setImage(reader.result);
-        // Simulate dimension detection with placeholder values
-        setTimeout(() => {
-          setDimensions({
-            length: '10',
-            width: '8',
-            height: '4'
-          });
+        
+        // Create an image element for detection
+        const img = new Image();
+        img.src = reader.result;
+        img.onload = async () => {
+          const detectedDimensions = await detectDimensions(img);
+          if (detectedDimensions) {
+            setDimensions(detectedDimensions);
+          } else {
+            // Fallback to default dimensions if detection fails
+            setDimensions({
+              length: '10',
+              width: '8',
+              height: '4'
+            });
+          }
           setLoading(false);
-        }, 1500);
+        };
       };
       reader.readAsDataURL(file);
     }
@@ -103,10 +157,11 @@ const GiftWrapper = () => {
           <p className="text-sm md:text-base text-purple-600 font-medium">Wrapp is here to make wrapping fun!</p>
           <div className="text-xs md:text-sm text-gray-600 space-y-2 bg-purple-50 p-3 rounded-lg">
             <p className="font-medium">Get the perfect wrap in three easy steps:</p>
-            <p>✨ Upload a photo of your gift or enter its dimensions</p>
+            <p>✨ Take a photo of your gift with a credit card or quarter next to it</p>
             <p>📏 Get the exact amount of wrapping paper you need</p>
             <p>🎁 Follow our simple folding instructions</p>
           </div>
+          <p className="text-xs md:text-sm text-gray-500 mt-1">* Place the reference item (credit card or quarter) flat next to your gift</p>
         </div>
       </CardHeader>
       <CardContent className="p-4 md:p-6">
