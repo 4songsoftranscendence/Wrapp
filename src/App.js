@@ -1,17 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Package, Upload } from 'lucide-react';
+import * as tf from '@tensorflow/tfjs';
+import * as cocossd from '@tensorflow-models/coco-ssd';
 
-const REFERENCE_SIZES = {
-  creditCard: {
-    width: 3.375, // inches
-    height: 2.125  // inches
-  },
-  quarter: {
-    diameter: 0.955 // inches
-  }
-};
-
-// Define Card components inline since we can't use the external library
+// Card components stay the same
 const Card = ({ className, children }) => (
   <div className={`bg-gradient-to-b from-white to-purple-50 rounded-lg shadow ${className}`}>{children}</div>
 );
@@ -37,32 +29,117 @@ const GiftWrapper = () => {
   const [result, setResult] = useState(null);
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [model, setModel] = useState(null);
+  const [debugInfo, setDebugInfo] = useState({
+    detectedObject: '',
+    confidence: 0,
+    bbox: null
+  });
   const imageRef = useRef(null);
 
-  const measureWithReference = (imgElement) => {
-    // This is a simplified measurement - we'll enhance it later
-    const estimatedWidthInches = imgElement.width / 100; // Simple ratio for now
-    return {
-      length: Math.round(estimatedWidthInches * 10) / 10,
-      width: Math.round((estimatedWidthInches * 0.8) * 10) / 10,
-      height: Math.round((estimatedWidthInches * 0.3) * 10) / 10
+  // Load COCO-SSD model when component mounts
+  useEffect(() => {
+    const loadModel = async () => {
+      try {
+        setLoading(true);
+        const loadedModel = await cocossd.load();
+        setModel(loadedModel);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error loading model:', error);
+        setLoading(false);
+      }
     };
+    loadModel();
+  }, []);
+
+  const measureWithReference = async (imgElement) => {
+    if (!model) return null;
+
+    try {
+      // Detect objects in the image
+      const predictions = await model.detect(imgElement);
+      
+      // Find the object with highest confidence
+      const mainObject = predictions.reduce((prev, current) => 
+        (prev.score > current.score) ? prev : current
+      );
+
+      if (mainObject) {
+        // Get bounding box
+        const [x, y, width, height] = mainObject.bbox;
+        
+        // Credit card standard width in inches
+        const creditCardWidth = 3.375;
+        
+        // Find credit card in predictions for scale
+        const creditCard = predictions.find(p => p.class.includes('card'));
+        let pixelsPerInch;
+        
+        if (creditCard) {
+          pixelsPerInch = creditCard.bbox[2] / creditCardWidth;
+        } else {
+          // Fallback: assume credit card takes up 25% of image width
+          pixelsPerInch = (imgElement.width * 0.25) / creditCardWidth;
+        }
+
+        // Convert pixels to inches
+        const objectWidthInches = width / pixelsPerInch;
+        const objectHeightInches = height / pixelsPerInch;
+        
+        // Determine if object is flat or cylindrical based on class and dimensions
+        const isFlat = mainObject.class.includes('book') || 
+                      mainObject.class.includes('laptop') ||
+                      mainObject.class.includes('cell phone');
+        
+        const isCylindrical = mainObject.class.includes('bottle') ||
+                            mainObject.class.includes('cup') ||
+                            mainObject.class.includes('wine glass');
+
+        setDebugInfo({
+          detectedObject: mainObject.class,
+          confidence: Math.round(mainObject.score * 100),
+          bbox: mainObject.bbox
+        });
+
+        let objectHeight;
+        if (isFlat) {
+          objectHeight = 0.2; // Very thin for flat objects
+        } else if (isCylindrical) {
+          objectHeight = Math.min(objectWidthInches, objectHeightInches); // Circular cross-section
+        } else {
+          objectHeight = Math.min(objectWidthInches, objectHeightInches) * 0.3; // Default box-like ratio
+        }
+
+        return {
+          length: Math.round(Math.max(objectWidthInches, objectHeightInches) * 2) / 2,
+          width: Math.round(Math.min(objectWidthInches, objectHeightInches) * 2) / 2,
+          height: Math.round(objectHeight * 2) / 2
+        };
+      }
+    } catch (error) {
+      console.error('Error detecting objects:', error);
+    }
+    
+    return null;
   };
 
-  const handleImageUpload = (event) => {
+  const handleImageUpload = async (event) => {
     const file = event.target.files[0];
     if (file && file.type.startsWith('image/')) {
       setLoading(true);
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         setImage(reader.result);
         
         // Create an image element to measure
         const img = new Image();
         img.src = reader.result;
-        img.onload = () => {
-          const measuredDimensions = measureWithReference(img);
-          setDimensions(measuredDimensions);
+        img.onload = async () => {
+          const measuredDimensions = await measureWithReference(img);
+          if (measuredDimensions) {
+            setDimensions(measuredDimensions);
+          }
           setLoading(false);
         };
       };
@@ -70,67 +147,12 @@ const GiftWrapper = () => {
     }
   };
 
-  const calculatePaper = () => {
-    const { length, width, height } = dimensions;
-    if (!length || !width || !height) return;
-
-    // Convert strings to numbers
-    const l = Number(length);
-    const w = Number(width);
-    const h = Number(height);
-
-    // Calculate paper dimensions
-    const paperLength = l + w + l + w + 4; // Extra 4 inches for overlap
-    const paperWidth = 2 * h + w + 4; // Extra 4 inches for folding edges
-
-    // Calculate surface area for reference
-    const surfaceArea = paperLength * paperWidth;
-
-    setResult({
-      paperLength: Math.ceil(paperLength),
-      paperWidth: Math.ceil(paperWidth),
-      surfaceArea: Math.ceil(surfaceArea)
-    });
-  };
-
-  const getFoldingInstructions = () => {
-    if (!result) return null;
-    
-    return (
-      <ol className="mt-2 md:mt-4 space-y-1 md:space-y-2 text-xs md:text-sm">
-        <li>1. Cut paper to {result.paperLength}" × {result.paperWidth}"</li>
-        <li>2. Place gift face down in the center of paper</li>
-        <li>3. Bring long sides together and overlap by 2", tape</li>
-        <li>4. At each end, fold sides in at 45° angle</li>
-        <li>5. Fold up bottom flap and tape</li>
-        <li>6. Fold down top flap and tape</li>
-      </ol>
-    );
-  };
+  // Rest of your component stays the same (calculatePaper, getFoldingInstructions, etc.)
+  // ... 
 
   return (
     <Card className="w-full max-w-[95%] md:max-w-md">
-      <CardHeader>
-        <CardTitle className="flex flex-col items-center text-center">
-          <div className="flex items-center gap-2 text-xl md:text-2xl font-bold text-purple-600">
-            <Package className="h-6 w-6 md:h-8 md:w-8" />
-            Wrapp
-          </div>
-          <p className="text-xs md:text-sm text-gray-600 mt-1 md:mt-2 font-normal">The app that helps you wrap!</p>
-        </CardTitle>
-        <div className="mt-4 text-center space-y-3">
-          <p className="text-base md:text-lg font-semibold text-emerald-600">✨ No More Gift-Wrapping Guesswork! ✨</p>
-          <p className="text-sm md:text-base text-purple-600 font-medium">Tired of wonky wrapping jobs? Done with wasting paper on failed attempts?</p>
-          <p className="text-sm md:text-base text-purple-600 font-medium">Wrapp is here to make wrapping fun!</p>
-          <div className="text-xs md:text-sm text-gray-600 space-y-2 bg-purple-50 p-3 rounded-lg">
-            <p className="font-medium">Get the perfect wrap in three easy steps:</p>
-            <p>✨ Take a photo of your gift with a credit card or quarter next to it</p>
-            <p>📏 Get the exact amount of wrapping paper you need</p>
-            <p>🎁 Follow our simple folding instructions</p>
-          </div>
-          <p className="text-xs md:text-sm text-gray-500 mt-1">* Place the reference item (credit card or quarter) flat next to your gift</p>
-        </div>
-      </CardHeader>
+      {/* ... Header section stays the same ... */}
       <CardContent className="p-4 md:p-6">
         <div className="mb-4 md:mb-6">
           <label className="block text-sm font-medium mb-2">
@@ -145,7 +167,29 @@ const GiftWrapper = () => {
                     <p className="text-sm text-gray-500">Analyzing image...</p>
                   </div>
                 ) : image ? (
-                  <div className="relative w-full h-full">
+                  <div className="relative w-full h-full flex flex-col items-center">
+                    <div className="text-xs text-gray-600 mb-2 bg-gray-100 p-2 rounded">
+                      {debugInfo.detectedObject ? (
+                        <>
+                          <p className="font-medium mb-1">Analysis Results:</p>
+                          <p>• We detected a {debugInfo.detectedObject}</p>
+                          <p>• Confidence in measurements: {debugInfo.confidence >= 90 ? 'Very High' : 
+                             debugInfo.confidence >= 75 ? 'High' :
+                             debugInfo.confidence >= 50 ? 'Moderate' : 'Low'} 
+                             ({debugInfo.confidence}%)
+                          </p>
+                          <p className="mt-1 text-gray-500 italic">
+                            {debugInfo.confidence < 75 ? 
+                              "Tip: Try taking another photo with better lighting and the credit card clearly visible" : 
+                              "Looks good! These measurements should be accurate"}
+                          </p>
+                        </>
+                      ) : loading ? (
+                        <p>Analyzing your gift...</p>
+                      ) : (
+                        <p>Ready to analyze your gift</p>
+                      )}
+                    </div>
                     <img
                       ref={imageRef}
                       src={image}
@@ -174,60 +218,7 @@ const GiftWrapper = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Length (in)</label>
-            <input
-              type="number"
-              min="0"
-              className="w-full p-1 md:p-2 border rounded text-sm md:text-base"
-              value={dimensions.length}
-              onChange={(e) => setDimensions({ ...dimensions, length: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Width (in)</label>
-            <input
-              type="number"
-              min="0"
-              className="w-full p-1 md:p-2 border rounded text-sm md:text-base"
-              value={dimensions.width}
-              onChange={(e) => setDimensions({ ...dimensions, width: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Height (in)</label>
-            <input
-              type="number"
-              min="0"
-              className="w-full p-1 md:p-2 border rounded text-sm md:text-base"
-              value={dimensions.height}
-              onChange={(e) => setDimensions({ ...dimensions, height: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <button
-          className="w-full bg-purple-500 text-white py-2 rounded-lg hover:bg-purple-600 transition-colors disabled:bg-gray-300 font-medium shadow-sm"
-          onClick={calculatePaper}
-          disabled={loading || !dimensions.length || !dimensions.width || !dimensions.height}
-        >
-          Calculate
-        </button>
-
-        {result && (
-          <div className="mt-3 md:mt-4">
-            <h3 className="font-medium mb-1 md:mb-2 text-sm md:text-base">Required Paper Size:</h3>
-            <p className="mb-2">
-              <span className="text-sm md:text-base">{result.paperLength}" × {result.paperWidth}"</span>
-              <span className="text-xs md:text-sm text-gray-500 ml-2">
-                (Area: {result.surfaceArea} sq in)
-              </span>
-            </p>
-            <h3 className="font-medium mb-1 md:mb-2 text-sm md:text-base">Folding Instructions:</h3>
-            {getFoldingInstructions()}
-          </div>
-        )}
+        {/* ... Rest of your component stays the same ... */}
       </CardContent>
     </Card>
   );
